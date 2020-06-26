@@ -96,8 +96,8 @@ ok_load_setup:
 	mov	$0x03, %ah		# read cursor pos
 	xor	%bh, %bh
 	int	$0x10
-	
-	mov	$24, %cx
+	# 显示字符串，Hello OS World!, My name is HXZ.
+	mov	$38, %cx
 	mov	$0x0007, %bx		# page 0, attribute 7 (normal)
 	#lea	msg1, %bp
 	mov     $msg1, %bp
@@ -246,7 +246,7 @@ sectors:
 
 msg1:
 	.byte 13,10
-	.ascii "Loading system ..."
+	.ascii "Hello OS World., My name is HXZ."
 	.byte 13,10,13,10
 
 	.org 508

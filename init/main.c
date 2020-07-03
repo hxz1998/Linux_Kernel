@@ -183,7 +183,7 @@ void init(void) {
     (void) dup(0);
     (void) dup(0);
 
-    // 完成了第一个实验 2020-6-24
+    // 完成了第 0 个实验 2020-6-24
     printf("\n\n\nXiaozhong Love You🌹Li @>--- (^.^) 2020-6-24\n\n\n");
     printf("%d buffers = %d bytes buffer space\n\r", NR_BUFFERS,
            NR_BUFFERS * BLOCK_SIZE);

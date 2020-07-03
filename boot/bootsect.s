@@ -66,16 +66,26 @@ go:	mov	%cs, %ax
 # Note that 'es' is already set up.
 
 load_setup:
-	mov	$0x0000, %dx		# drive 0, head 0
-	mov	$0x0002, %cx		# sector 2, track 0
-	mov	$0x0200, %bx		# address = 512, in INITSEG
+	mov	$0x0000, %dx		# drive 0, head 0 设置驱动器和磁头
+	mov	$0x0002, %cx		# sector 2, track 0 设置扇区号和磁道
+	mov	$0x0200, %bx		# address = 512, in INITSEG 设置读入的内存地址，BOOTSEG+address = 512，偏移 512 个字节
+	# 设置读入的扇区个数(service 2, nr of sectors)，
+	# SETUPLEN是读入的扇区个数，Linux 0.11 设置的是 4，
+	# 我们不需要那么多，我们设置为 2（因此还需要添加变量 SETUPLEN=2）
 	.equ    AX, 0x0200+SETUPLEN
 	mov     $AX, %ax		# service 2, nr of sectors
+	
+	# 应用 0x13 号 BIOS 中断读入 2 个 setup.s扇区
 	int	$0x13			# read it
+
+	# 应用 0x13 号 BIOS 中断读入 2 个 setup.s扇区
 	jnc	ok_load_setup		# ok - continue
+
+	# 软驱、软盘有问题才会执行到这里。否则复位软驱
 	mov	$0x0000, %dx
 	mov	$0x0000, %ax		# reset the diskette
 	int	$0x13
+	# 重新循环，再次读取
 	jmp	load_setup
 
 ok_load_setup:
@@ -93,16 +103,20 @@ ok_load_setup:
 
 # Print some inane message
 
-	mov	$0x03, %ah		# read cursor pos
-	xor	%bh, %bh
-	int	$0x10
+	# 首先将光标位置读取进来应用 0x13 号 BIOS 中断读入 2 个 setup.s扇区
+
 	# 显示字符串，Hello OS World!, My name is HXZ.
+	# 要显示的字符长度 38 个字符
 	mov	$38, %cx
 	mov	$0x0007, %bx		# page 0, attribute 7 (normal)
 	#lea	msg1, %bp
 	mov     $msg1, %bp
+	# es:bp 是字符串的地址
+	; mov $0x07c0, %ax
+	; mov %es, %ax
 	mov	$0x1301, %ax		# write string, move cursor
 	int	$0x10
+
 
 # ok, we've written the message, now
 # we want to load the system (at 0x10000)

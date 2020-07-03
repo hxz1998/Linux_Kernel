@@ -34,20 +34,21 @@ _start:
 
 # ok, the read went well so we get current cursor position and save it for
 # posterity.
-
+	# 下面是将硬件参数读取出来放在内存 0x90000 的关键代码
 	mov	$INITSEG, %ax	# this is done in bootsect already, but...
 	mov	%ax, %ds
 	mov	$0x03, %ah	# read cursor pos
 	xor	%bh, %bh
-	int	$0x10		# save it in known place, con_init fetches
-	mov	%dx, %ds:0	# it from 0x90000.
-# Get memory size (extended mem, kB)
+	int	$0x10		# save it in known place, con_init fetches 调用中断
+	mov	%dx, %ds:0	# it from 0x90000. 将光标位置写入 0x90000
+
+# Get memory size (extended mem, kB) 读入内存大小和位置
 
 	mov	$0x88, %ah 
 	int	$0x15
 	mov	%ax, %ds:2
 
-# Get video-card data:
+# Get video-card data: 
 
 	mov	$0x0f, %ah
 	int	$0x10

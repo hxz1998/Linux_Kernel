@@ -58,11 +58,13 @@ sa_mask = 4
 sa_flags = 8
 sa_restorer = 12
 
-nr_system_calls = 72
+# 系统调用总数，增删了系统调用后需要修改这个数值
+nr_system_calls = 74
 
 /*
  * Ok, I get parallel printer interrupts while using the floppy for some
  * strange reason. Urgel. Now I just ignore them.
+ * 使用 globl 修饰，使得其他函数可见
  */
 .globl system_call,sys_fork,timer_interrupt,sys_execve
 .globl hd_interrupt,floppy_interrupt,parallel_interrupt
@@ -78,20 +80,20 @@ reschedule:
 	jmp schedule
 .align 2
 system_call:
-	cmpl $nr_system_calls-1,%eax
+	cmpl $nr_system_calls-1,%eax	# 检查系统调用编号是否在合法范围内
 	ja bad_sys_call
 	push %ds
 	push %es
 	push %fs
 	pushl %edx
-	pushl %ecx		# push %ebx,%ecx,%edx as parameters
-	pushl %ebx		# to the system call
-	movl $0x10,%edx		# set up ds,es to kernel space
+	pushl %ecx		# push %ebx,%ecx,%edx as parameters 传递给系统调用的参数
+	pushl %ebx		# to the system call 
+	movl $0x10,%edx		# set up ds,es to kernel space 让ds，es指向 GDT 内核地址空间
 	mov %dx,%ds
 	mov %dx,%es
-	movl $0x17,%edx		# fs points to local data space
+	movl $0x17,%edx		# fs points to local data space 让fs指向LDT，用户地址空间
 	mov %dx,%fs
-	call *sys_call_table(,%eax,4)
+	call *sys_call_table(,%eax,4) # eax 中存放的是系统调用号，即 __NR__xxxxxx
 	pushl %eax
 	movl current,%eax
 	cmpl $0,state(%eax)		# state

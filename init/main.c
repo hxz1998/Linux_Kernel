@@ -134,6 +134,7 @@ void main(void)        /* This really IS void, no error here. */
 #ifdef RAMDISK
     main_memory_start += rd_init(main_memory_start, RAMDISK*1024);
 #endif
+    /*内存初始化*/
     mem_init(main_memory_start, memory_end);
     trap_init();
     blk_dev_init();

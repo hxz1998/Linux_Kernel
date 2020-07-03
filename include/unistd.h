@@ -64,6 +64,10 @@
 #define __NR_write	4
 #define __NR_open	5
 #define __NR_close	6
+/*
+添加系统调用时需要修改include/unistd.h文件，
+使其包含__NR_whoami和__NR_iam。
+*/
 #define __NR_waitpid	7
 #define __NR_creat	8
 #define __NR_link	9
@@ -130,6 +134,9 @@
 #define __NR_setreuid	70
 #define __NR_setregid	71
 
+/*添加系统调用号的存储位置*/
+#define __NR_whoami	72
+#define __NR_iam 73
 #define _syscall0(type,name) \
   type name(void) \
 { \
@@ -251,4 +258,9 @@ int getppid(void);
 pid_t getpgrp(void);
 pid_t setsid(void);
 
+// /* iam()在用户空间的接口函数 */
+// _syscall1(int, iam, const char*, name);
+
+// /* whoami()在用户空间的接口函数 */
+// _syscall2(int, whoami,char*,name,unsigned int,size);
 #endif

@@ -27,7 +27,7 @@ int printk(const char *fmt, ...)
 	i=vsprintf(buf,fmt,args);
 	va_end(args);
 	__asm__("push %%fs\n\t"
-		"push %%ds\n\t"
+		"push %%ds\n\t" // 先保存指向用户段的寄存器，最后再使用 pop 将其恢复
 		"pop %%fs\n\t"
 		"pushl %0\n\t"
 		"pushl $buf\n\t"

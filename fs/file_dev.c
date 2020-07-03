@@ -62,6 +62,7 @@ int file_write(struct m_inode * inode, struct file * filp, char * buf, int count
 	else
 		pos = filp->f_pos;
 	while (i<count) {
+		// 算出盘块号 block
 		if (!(block = create_block(inode,pos/BLOCK_SIZE)))
 			break;
 		if (!(bh=bread(inode->i_dev,block)))

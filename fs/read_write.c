@@ -80,11 +80,13 @@ int sys_read(unsigned int fd,char * buf,int count)
 	return -EINVAL;
 }
 
+// fd 决定了往哪里写数据，是找到 file 的索引
 int sys_write(unsigned int fd,char * buf,int count)
 {
 	struct file * file;
 	struct m_inode * inode;
 	
+	// current 是 PCB 中的东西，进程带动整个系统的视图
 	if (fd>=NR_OPEN || count <0 || !(file=current->filp[fd]))
 		return -EINVAL;
 	if (!count)

@@ -50,11 +50,12 @@ int copy_mem(int nr,struct task_struct * p)
 		panic("We don't support separate I&D");
 	if (data_limit < code_limit)
 		panic("Bad data_limit");
-	new_data_base = new_code_base = nr * 0x4000000;
+	new_data_base = new_code_base = nr * 0x4000000; // nr * 64M 每个进程占据64M虚拟空间，互不重叠
 	p->start_code = new_code_base;
-	set_base(p->ldt[1],new_code_base);
+	set_base(p->ldt[1],new_code_base);  // p是PCB，进程切换的时候PCB需要切换
 	set_base(p->ldt[2],new_data_base);
 	if (copy_page_tables(old_data_base,new_data_base,data_limit)) {
+	    // 分配内存，建页表
 		printk("free_page_tables: from copy_mem\n");
 		free_page_tables(new_data_base,data_limit);
 		return -ENOMEM;

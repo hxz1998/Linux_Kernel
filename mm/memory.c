@@ -31,7 +31,7 @@
 void do_exit(long code);
 
 static inline void oom(void)
-{
+{  
 	printk("out of memory\n\r");
 	do_exit(SIGSEGV);
 }

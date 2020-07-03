@@ -209,6 +209,7 @@ void init(void) {
             close(2);
             setsid();
             (void) open("/dev/tty0", O_RDWR, 0);
+            // 拷贝了两份 tty0 文件
             (void) dup(0);
             (void) dup(0);
             _exit(execve("/bin/sh", argv, envp));

@@ -13,3 +13,5 @@ System.map
 **/system
 kernel/chr_drv/keyboard.s
 
+.vscode/launch.json
+.vscode/*

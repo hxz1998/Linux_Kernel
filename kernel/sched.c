@@ -43,6 +43,14 @@ void show_stat(void)
 			show_task(i,task[i]);
 }
 
+/**
+ * 再加上 PC 机 8253 定时芯片的输入时钟频率为 1.193180MHz，
+ * 即 1193180/每秒，
+ * LATCH=1193180/100，
+ * 时钟每跳 11931.8 下产生一次时钟中断，
+ * 即每 1/100 秒（10ms）产生一次时钟中断，
+ * 所以 jiffies 实际上记录了从开机以来共经过了多少个 10ms。
+ */ 
 #define LATCH (1193180/HZ)
 
 extern void mem_use(void);
@@ -57,7 +65,7 @@ union task_union {
 
 static union task_union init_task = {INIT_TASK,};
 
-long volatile jiffies=0;
+long volatile jiffies=0;// 它记录了从开机到当前时间的时钟中断发生次数
 long startup_time=0;
 struct task_struct *current = &(init_task.task);
 struct task_struct *last_task_used_math = NULL;
@@ -126,18 +134,25 @@ void schedule(void)
 		next = 0;
 		i = NR_TASKS;
 		p = &task[NR_TASKS];
+
+		// 找到 counter 值最大的就绪态进程
 		while (--i) {
 			if (!*--p)
 				continue;
 			if ((*p)->state == TASK_RUNNING && (*p)->counter > c)
 				c = (*p)->counter, next = i;
 		}
+		// 如果有 counter 值大于0的就绪态进程，则退出
 		if (c) break;
+
+		// 如果没有，那么所有进程的 counter 值除以 2 衰减后再和 priority 值相加
+		// 这样，对正被阻塞的进程来说，一个进程在阻塞队列中停留的时间越长，其优先级越大，
+		// 被分配的时间片也就会越大。
 		for(p = &LAST_TASK ; p > &FIRST_TASK ; --p)
 			if (*p)
-				(*p)->counter = ((*p)->counter >> 1) +
-						(*p)->priority;
+				(*p)->counter = ((*p)->counter >> 1) + (*p)->priority;
 	}
+	// 切换到 next 进程
 	switch_to(next);
 }
 
@@ -156,14 +171,50 @@ void sleep_on(struct task_struct **p)
 		return;
 	if (current == &(init_task.task))
 		panic("task[0] trying to sleep");
+
+	// 最隐蔽的指针，实际上是将 current 插入到等待队列的头部， tmp 则是原来的头部
 	tmp = *p;
 	*p = current;
+	// 切换到睡眠状态
 	current->state = TASK_UNINTERRUPTIBLE;
+	// 让出CPU
 	schedule();
+	// 唤醒队列中的上一个 tmp 睡眠进程，0 换作 TASK_RUNNING 更好, 因为 TASK_RUNNING 也是0
 	if (tmp)
-		tmp->state=0;
+		tmp->state=TASK_RUNNING;
 }
 
+/**
+ * TASK_UNINTERRUPTIBLE和TASK_INTERRUPTIBLE的区别在于不可中断的睡眠
+ * 只能由wake_up()显式唤醒，再由上面的 schedule()语句后的
+ *
+ *   if (tmp) tmp->state=0;
+ *
+ * 依次唤醒，所以不可中断的睡眠进程一定是按严格从“队列”（一个依靠
+ * 放在进程内核栈中的指针变量tmp维护的队列）的首部进行唤醒。而对于可
+ * 中断的进程，除了用wake_up唤醒以外，也可以用信号（给进程发送一个信
+ * 号，实际上就是将进程PCB中维护的一个向量的某一位置位，进程需要在合
+ * 适的时候处理这一位。感兴趣的实验者可以阅读有关代码）来唤醒，如在
+ * schedule()中：
+ *
+ *  for(p = &LAST_TASK ; p > &FIRST_TASK ; --p)
+ *      if (((*p)->signal & ~(_BLOCKABLE & (*p)->blocked)) &&
+ *         (*p)->state==TASK_INTERRUPTIBLE)
+ *         (*p)->state=TASK_RUNNING;//唤醒
+ *
+ * 就是当进程是可中断睡眠时，如果遇到一些信号就将其唤醒。这样的唤醒会
+ * 出现一个问题，那就是可能会唤醒等待队列中间的某个进程，此时这个链就
+ * 需要进行适当调整。interruptible_sleep_on和sleep_on函数的主要区别就
+ * 在这里。
+ * 
+ * 总的来说，Linux 0.11 支持四种进程状态的转移：
+ * 就绪到运行、运行到就绪、运行到睡眠和睡眠到就绪，此外还有新建和退出两种情况。
+ * 其中就绪与运行间的状态转移是通过 schedule()（它亦是调度算法所在）完成的；
+ * 运行到睡眠依靠的是 sleep_on() 和 interruptible_sleep_on()，
+ * 还有进程主动睡觉的系统调用 sys_pause() 和 sys_waitpid()；
+ * 睡眠到就绪的转移依靠的是 wake_up()。
+ * 所以只要在这些函数的适当位置插入适当的处理语句就能完成进程运行轨迹的全面跟踪了。
+ */
 void interruptible_sleep_on(struct task_struct **p)
 {
 	struct task_struct *tmp;
@@ -176,13 +227,16 @@ void interruptible_sleep_on(struct task_struct **p)
 	*p=current;
 repeat:	current->state = TASK_INTERRUPTIBLE;
 	schedule();
+	// 如果队列头进程和刚唤醒的进程 current 不是一个，
+	// 说明从队列中间唤醒了一个进程，需要处理
 	if (*p && *p != current) {
+		// 将队列头唤醒，并通过 goto repeat 让自己再去睡眠
 		(**p).state=0;
 		goto repeat;
 	}
 	*p=NULL;
 	if (tmp)
-		tmp->state=0;
+		tmp->state=TASK_RUNNING;
 }
 
 void wake_up(struct task_struct **p)
@@ -375,6 +429,7 @@ int sys_getegid(void)
 	return current->egid;
 }
 
+// 查找所有的代码，只有一个地方修改过 priority，那就是 nice 系统调用
 int sys_nice(long increment)
 {
 	if (current->priority-increment>0)
@@ -403,10 +458,11 @@ void sched_init(void)
 	__asm__("pushfl ; andl $0xffffbfff,(%esp) ; popfl");
 	ltr(0);
 	lldt(0);
+	// 设置8253模式，用来设置每次时钟中断的间隔，即 LATCH 
 	outb_p(0x36,0x43);		/* binary, mode 3, LSB/MSB, ch 0 */
 	outb_p(LATCH & 0xff , 0x40);	/* LSB */
 	outb(LATCH >> 8 , 0x40);	/* MSB */
-	set_intr_gate(0x20,&timer_interrupt);
+	set_intr_gate(0x20,&timer_interrupt); // 时钟中断处理函数
 	outb(inb_p(0x21)&~0x01,0x21);
-	set_system_gate(0x80,&system_call);
+    set_system_gate(0x80,&system_call);
 }

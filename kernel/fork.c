@@ -76,7 +76,7 @@ int copy_process(int nr,long ebp,long edi,long esi,long gs,long none,
 	struct task_struct *p;
 	int i;
 	struct file *f;
-
+	// 获得一个 task_struct 结构体空间
 	p = (struct task_struct *) get_free_page();
 	if (!p)
 		return -EAGAIN;
@@ -84,17 +84,24 @@ int copy_process(int nr,long ebp,long edi,long esi,long gs,long none,
 	
 	// NOTE!: the following statement now work with gcc 4.3.2 now, and you
 	// must compile _THIS_ memcpy without no -O of gcc.#ifndef GCC4_3
+
+	// 用来复制父进程的 PCB 数据信息，包括 priority 和 counter
 	*p = *current;	/* NOTE! this doesn't copy the supervisor stack */
 	p->state = TASK_UNINTERRUPTIBLE;
 	p->pid = last_pid;
 	p->father = current->pid;
+
+	// 初始化 counter
+	// 因为父进程的counter数值已发生变化，而 priority 不会，所以上面的第二句代码将p->counter 设置成 p->priority。
+	// 每个进程的 priority 都是继承自父亲进程的，除非它自己改变优先级。
 	p->counter = p->priority;
 	p->signal = 0;
 	p->alarm = 0;
 	p->leader = 0;		/* process leadership doesn't inherit */
 	p->utime = p->stime = 0;
 	p->cutime = p->cstime = 0;
-	p->start_time = jiffies;
+	p->start_time = jiffies; // 设置 start_time 为 jiffies，
+							 //该数值在 kernel/system_call.s 文件中 timer_interrupt 中定义
 	p->tss.back_link = 0;
 	p->tss.esp0 = PAGE_SIZE + (long) p;
 	p->tss.ss0 = 0x10;
@@ -134,6 +141,12 @@ int copy_process(int nr,long ebp,long edi,long esi,long gs,long none,
 		current->executable->i_count++;
 	set_tss_desc(gdt+(nr<<1)+FIRST_TSS_ENTRY,&(p->tss));
 	set_ldt_desc(gdt+(nr<<1)+FIRST_LDT_ENTRY,&(p->ldt));
+
+	/**
+	 * 设置进程为就绪态，所有就绪态的进程状态都是 TASK_RUNNING(0)，
+	 * 被全局变量 current 指向的是正在运行的进程
+	 * 要完成进程运行轨迹的记录就要在 copy_process() 中添加输出语句
+	 */ 
 	p->state = TASK_RUNNING;	/* do this last, just in case */
 	return last_pid;
 }

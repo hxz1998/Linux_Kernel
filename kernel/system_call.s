@@ -188,7 +188,7 @@ timer_interrupt:
 	mov %ax,%es
 	movl $0x17,%eax
 	mov %ax,%fs
-	incl jiffies
+	incl jiffies	# 增加 jiffies 计数值， 说明 jiffies 表示从开机到现在发生的时钟中断次数
 	movb $0x20,%al		# EOI to interrupt controller #1
 	outb %al,$0x20
 	movl CS(%esp),%eax
@@ -211,11 +211,13 @@ sys_fork:
 	call find_empty_process
 	testl %eax,%eax
 	js 1f
+	# 传递参数
 	push %gs
 	pushl %esi
 	pushl %edi
 	pushl %ebp
 	pushl %eax
+	# 调用 copy_process 实现进程创建，该函数在 kernel/fork.c 文件中
 	call copy_process
 	addl $20,%esp
 1:	ret
